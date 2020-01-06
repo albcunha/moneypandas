@@ -1,6 +1,7 @@
 import abc
 import decimal
 import collections
+import importlib #used to check if babel library is installed
 
 import numpy as np
 from pandas.compat.numpy import function as nv
@@ -14,6 +15,12 @@ from ._accessor import (DelegatedMethod, DelegatedProperty,
 from .base import NumPyBackedExtensionArrayMixin
 from .parser import _as_money_object
 import re
+
+#checks if babel library is installed to us money.Xmoney formatting on _formatter()
+babel_spec = importlib.util.find_spec("babel")
+babel_found = babel_spec is not None
+if babel_found:
+  import locale #it is not necessary to import babel as xmoney will do it.
 
 # -----------------------------------------------------------------------------
 # Extension Type
@@ -353,7 +360,7 @@ class MoneyArray(NumPyBackedExtensionArrayMixin):
         [XMoney('120', 'EUR'), XMoney('127', 'USD')]
         """
         return [money.XMoney(x['va'], x['cu']) if x['cu'] else np.nan for x in self.data]
-
+        
     def to_bytes(self):
         r"""Serialize the MoneyArray as a Python bytestring.
 
@@ -454,10 +461,14 @@ class MoneyArray(NumPyBackedExtensionArrayMixin):
     _formatting_values = None
     def _formatter(self, boxed=False):
         def fmt(x):
-            if isinstance(x, money.XMoney):
-                return str(x)
-            elif not x:
-                return "NA"
+            if babel_found:
+                if isinstance(x, money.XMoney):
+                    return x.format(locale.getdefaultlocale()[0])
+            else:
+                if isinstance(x, money.XMoney):
+                    return str(x)
+                elif not x:
+                    return "NA"
         return fmt
 
     def _values_for_factorize(self):
